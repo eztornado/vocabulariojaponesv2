@@ -9,18 +9,18 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
 
   // Category operations
-  getCategories(): Promise<Category[]>;
-  getCategory(id: number): Promise<Category | undefined>;
-  createCategory(category: InsertCategory): Promise<Category>;
-  updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category>;
-  deleteCategory(id: number): Promise<void>;
+  getCategories(userId: number): Promise<Category[]>;
+  getCategory(id: number, userId: number): Promise<Category | undefined>;
+  createCategory(category: InsertCategory & { userId: number }): Promise<Category>;
+  updateCategory(id: number, userId: number, category: Partial<InsertCategory>): Promise<Category>;
+  deleteCategory(id: number, userId: number): Promise<void>;
 
   // Word operations
-  getWords(categoryId?: number): Promise<Word[]>;
-  getWord(id: number): Promise<Word | undefined>;
-  createWord(word: InsertWord): Promise<Word>;
-  updateWord(id: number, word: Partial<InsertWord>): Promise<Word>;
-  deleteWord(id: number): Promise<void>;
+  getWords(userId: number, categoryId?: number): Promise<Word[]>;
+  getWord(id: number, userId: number): Promise<Word | undefined>;
+  createWord(word: InsertWord & { userId: number }): Promise<Word>;
+  updateWord(id: number, userId: number, word: Partial<InsertWord>): Promise<Word>;
+  deleteWord(id: number, userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -40,75 +40,92 @@ export class DatabaseStorage implements IStorage {
     return newUser;
   }
 
-  // Existing Category operations
-  async getCategories(): Promise<Category[]> {
-    return await db.select().from(categories);
+  // Category operations
+  async getCategories(userId: number): Promise<Category[]> {
+    return await db.select().from(categories).where(eq(categories.userId, userId));
   }
 
-  async getCategory(id: number): Promise<Category | undefined> {
-    const [category] = await db.select().from(categories).where(eq(categories.id, id));
+  async getCategory(id: number, userId: number): Promise<Category | undefined> {
+    const [category] = await db
+      .select()
+      .from(categories)
+      .where(eq(categories.id, id))
+      .where(eq(categories.userId, userId));
     return category;
   }
 
-  async createCategory(category: InsertCategory): Promise<Category> {
+  async createCategory(category: InsertCategory & { userId: number }): Promise<Category> {
     const [newCategory] = await db.insert(categories).values(category).returning();
     return newCategory;
   }
 
-  async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category> {
+  async updateCategory(id: number, userId: number, category: Partial<InsertCategory>): Promise<Category> {
     const [updatedCategory] = await db
       .update(categories)
       .set(category)
       .where(eq(categories.id, id))
+      .where(eq(categories.userId, userId))
       .returning();
 
     if (!updatedCategory) throw new Error("Category not found");
     return updatedCategory;
   }
 
-  async deleteCategory(id: number): Promise<void> {
+  async deleteCategory(id: number, userId: number): Promise<void> {
     // First update words to remove the category reference
     await db
       .update(words)
       .set({ categoryId: null })
-      .where(eq(words.categoryId, id));
+      .where(eq(words.categoryId, id))
+      .where(eq(words.userId, userId));
 
     // Then delete the category
-    await db.delete(categories).where(eq(categories.id, id));
+    await db
+      .delete(categories)
+      .where(eq(categories.id, id))
+      .where(eq(categories.userId, userId));
   }
 
   // Word operations
-  async getWords(categoryId?: number): Promise<Word[]> {
-    let query = db.select().from(words);
+  async getWords(userId: number, categoryId?: number): Promise<Word[]> {
+    let query = db.select().from(words).where(eq(words.userId, userId));
     if (categoryId !== undefined) {
       query = query.where(eq(words.categoryId, categoryId));
     }
     return await query;
   }
 
-  async getWord(id: number): Promise<Word | undefined> {
-    const [word] = await db.select().from(words).where(eq(words.id, id));
+  async getWord(id: number, userId: number): Promise<Word | undefined> {
+    const [word] = await db
+      .select()
+      .from(words)
+      .where(eq(words.id, id))
+      .where(eq(words.userId, userId));
     return word;
   }
 
-  async createWord(word: InsertWord): Promise<Word> {
+  async createWord(word: InsertWord & { userId: number }): Promise<Word> {
     const [newWord] = await db.insert(words).values(word).returning();
     return newWord;
   }
 
-  async updateWord(id: number, word: Partial<InsertWord>): Promise<Word> {
+  async updateWord(id: number, userId: number, word: Partial<InsertWord>): Promise<Word> {
     const [updatedWord] = await db
       .update(words)
       .set(word)
       .where(eq(words.id, id))
+      .where(eq(words.userId, userId))
       .returning();
 
     if (!updatedWord) throw new Error("Word not found");
     return updatedWord;
   }
 
-  async deleteWord(id: number): Promise<void> {
-    await db.delete(words).where(eq(words.id, id));
+  async deleteWord(id: number, userId: number): Promise<void> {
+    await db
+      .delete(words)
+      .where(eq(words.id, id))
+      .where(eq(words.userId, userId));
   }
 }
 

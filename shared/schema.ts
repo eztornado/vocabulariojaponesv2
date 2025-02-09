@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -10,8 +11,9 @@ export const users = pgTable("users", {
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
-  description: text("description")
+  name: text("name").notNull(),
+  description: text("description"),
+  userId: integer("user_id").notNull().references(() => users.id)
 });
 
 export const words = pgTable("words", {
@@ -19,8 +21,33 @@ export const words = pgTable("words", {
   japanese: text("japanese").notNull(),
   romaji: text("romaji").notNull(),
   spanish: text("spanish").notNull(),
-  categoryId: integer("category_id").references(() => categories.id)
+  categoryId: integer("category_id").references(() => categories.id),
+  userId: integer("user_id").notNull().references(() => users.id)
 });
+
+// Relaciones
+export const usersRelations = relations(users, ({ many }) => ({
+  categories: many(categories),
+  words: many(words)
+}));
+
+export const categoriesRelations = relations(categories, ({ one }) => ({
+  user: one(users, {
+    fields: [categories.userId],
+    references: [users.id],
+  })
+}));
+
+export const wordsRelations = relations(words, ({ one }) => ({
+  category: one(categories, {
+    fields: [words.categoryId],
+    references: [categories.id],
+  }),
+  user: one(users, {
+    fields: [words.userId],
+    references: [users.id],
+  })
+}));
 
 // User schemas
 export const insertUserSchema = createInsertSchema(users).extend({
