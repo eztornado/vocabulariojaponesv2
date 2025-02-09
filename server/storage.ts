@@ -1,4 +1,6 @@
-import { type Category, type InsertCategory, type Word, type InsertWord } from "@shared/schema";
+import { type Category, type InsertCategory, type Word, type InsertWord, categories, words } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // Category operations
@@ -16,84 +18,75 @@ export interface IStorage {
   deleteWord(id: number): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private categories: Map<number, Category>;
-  private words: Map<number, Word>;
-  private categoryCurrentId: number;
-  private wordCurrentId: number;
-
-  constructor() {
-    this.categories = new Map();
-    this.words = new Map();
-    this.categoryCurrentId = 1;
-    this.wordCurrentId = 1;
-  }
-
+export class DatabaseStorage implements IStorage {
   async getCategories(): Promise<Category[]> {
-    return Array.from(this.categories.values());
+    return await db.select().from(categories);
   }
 
   async getCategory(id: number): Promise<Category | undefined> {
-    return this.categories.get(id);
-  }
-
-  async createCategory(insertCategory: InsertCategory): Promise<Category> {
-    const id = this.categoryCurrentId++;
-    const category: Category = { ...insertCategory, id };
-    this.categories.set(id, category);
+    const [category] = await db.select().from(categories).where(eq(categories.id, id));
     return category;
   }
 
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const [newCategory] = await db.insert(categories).values(category).returning();
+    return newCategory;
+  }
+
   async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category> {
-    const existing = await this.getCategory(id);
-    if (!existing) throw new Error("Category not found");
-    
-    const updated = { ...existing, ...category };
-    this.categories.set(id, updated);
-    return updated;
+    const [updatedCategory] = await db
+      .update(categories)
+      .set(category)
+      .where(eq(categories.id, id))
+      .returning();
+
+    if (!updatedCategory) throw new Error("Category not found");
+    return updatedCategory;
   }
 
   async deleteCategory(id: number): Promise<void> {
-    this.categories.delete(id);
-    // Remove category from words
-    for (const word of this.words.values()) {
-      if (word.categoryId === id) {
-        await this.updateWord(word.id, { categoryId: null });
-      }
-    }
+    // First update words to remove the category reference
+    await db
+      .update(words)
+      .set({ categoryId: null })
+      .where(eq(words.categoryId, id));
+
+    // Then delete the category
+    await db.delete(categories).where(eq(categories.id, id));
   }
 
   async getWords(categoryId?: number): Promise<Word[]> {
-    const words = Array.from(this.words.values());
+    let query = db.select().from(words);
     if (categoryId !== undefined) {
-      return words.filter(word => word.categoryId === categoryId);
+      query = query.where(eq(words.categoryId, categoryId));
     }
-    return words;
+    return await query;
   }
 
   async getWord(id: number): Promise<Word | undefined> {
-    return this.words.get(id);
-  }
-
-  async createWord(insertWord: InsertWord): Promise<Word> {
-    const id = this.wordCurrentId++;
-    const word: Word = { ...insertWord, id };
-    this.words.set(id, word);
+    const [word] = await db.select().from(words).where(eq(words.id, id));
     return word;
   }
 
+  async createWord(word: InsertWord): Promise<Word> {
+    const [newWord] = await db.insert(words).values(word).returning();
+    return newWord;
+  }
+
   async updateWord(id: number, word: Partial<InsertWord>): Promise<Word> {
-    const existing = await this.getWord(id);
-    if (!existing) throw new Error("Word not found");
-    
-    const updated = { ...existing, ...word };
-    this.words.set(id, updated);
-    return updated;
+    const [updatedWord] = await db
+      .update(words)
+      .set(word)
+      .where(eq(words.id, id))
+      .returning();
+
+    if (!updatedWord) throw new Error("Word not found");
+    return updatedWord;
   }
 
   async deleteWord(id: number): Promise<void> {
-    this.words.delete(id);
+    await db.delete(words).where(eq(words.id, id));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
