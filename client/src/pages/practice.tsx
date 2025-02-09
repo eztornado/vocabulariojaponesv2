@@ -22,7 +22,14 @@ export default function Practice() {
 
   const { data: words } = useQuery<Word[]>({
     queryKey: ["/api/words", selectedCategory],
-    enabled: !!selectedCategory,
+    queryFn: async () => {
+      const url = selectedCategory 
+        ? `/api/words?categoryId=${selectedCategory}`
+        : "/api/words";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch words");
+      return res.json();
+    }
   });
 
   const currentWord = words?.[currentWordIndex];
@@ -55,7 +62,7 @@ export default function Practice() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-4 text-center">Práctica</h1>
-          
+
           <Select
             value={selectedCategory}
             onValueChange={setSelectedCategory}
@@ -64,6 +71,7 @@ export default function Practice() {
               <SelectValue placeholder="Seleccionar categoría" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="">Todas</SelectItem>
               {categories.map((category) => (
                 <SelectItem 
                   key={category.id} 
