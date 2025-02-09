@@ -23,7 +23,7 @@ export default function Practice() {
   const { data: words } = useQuery<Word[]>({
     queryKey: ["/api/words", selectedCategory],
     queryFn: async () => {
-      const url = selectedCategory 
+      const url = selectedCategory && selectedCategory !== "all"
         ? `/api/words?categoryId=${selectedCategory}`
         : "/api/words";
       const res = await fetch(url, { credentials: "include" });
@@ -71,7 +71,7 @@ export default function Practice() {
               <SelectValue placeholder="Seleccionar categoría" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas</SelectItem>
+              <SelectItem value="all">Todas</SelectItem>
               {categories.map((category) => (
                 <SelectItem 
                   key={category.id} 
