@@ -1,8 +1,13 @@
-import { type Category, type InsertCategory, type Word, type InsertWord, categories, words } from "@shared/schema";
+import { type Category, type InsertCategory, type Word, type InsertWord, type User, type InsertUser, categories, words, users } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 
 export interface IStorage {
+  // User operations
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
   // Category operations
   getCategories(): Promise<Category[]>;
   getCategory(id: number): Promise<Category | undefined>;
@@ -19,6 +24,23 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  // Existing Category operations
   async getCategories(): Promise<Category[]> {
     return await db.select().from(categories);
   }
@@ -55,6 +77,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(categories).where(eq(categories.id, id));
   }
 
+  // Word operations
   async getWords(categoryId?: number): Promise<Word[]> {
     let query = db.select().from(words);
     if (categoryId !== undefined) {

@@ -2,8 +2,12 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCategorySchema, insertWordSchema } from "@shared/schema";
+import { setupAuth } from "./auth";
 
 export function registerRoutes(app: Express): Server {
+  // Setup authentication
+  setupAuth(app);
+
   // Category routes
   app.get("/api/categories", async (_req, res) => {
     const categories = await storage.getCategories();
